@@ -28,8 +28,7 @@ optional arguments:
 required arguments:
   -i INPUT, --input INPUT
                         /path/to/VariantsToTable_output.txt
-                        It is assumed that there is either a 'CHROM' or 'unstitched_chrom'
-                        column (ref.fa record name), and either a 'locus' or 'unstitched_locus' column.
+                        It is assumed that there is either a 'locus' or 'unstitched_locus' column.
                         The 'locus' column elements are the hyphen-separated
                         CHROM-POS. If the 'unstitched_chrom' column is present, the code will use the
                         'unstitched_locus' column for SNP names, otherwise 'CHROM' and 'locus'. The

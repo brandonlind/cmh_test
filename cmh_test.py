@@ -333,8 +333,7 @@ def get_parse():
                                dest="input",
                                type=str,
                                help='''/path/to/VariantsToTable_output.txt
-It is assumed that there is either a 'CHROM' or 'unstitched_chrom'
-column (ref.fa record name), and either a 'locus' or 'unstitched_locus' column.
+It is assumed that there is either a 'locus' or 'unstitched_locus' column.
 The 'locus' column elements are the hyphen-separated
 CHROM-POS. If the 'unstitched_chrom' column is present, the code will use the
 'unstitched_locus' column for SNP names, otherwise 'CHROM' and 'locus'. The
@@ -347,7 +346,9 @@ assumed.
                                default=None,
                                dest="outdir",
                                type=str,
-                               help="/path/to/pypoolation_output_dir/")
+                               help='''/path/to/pypoolation_output_dir/
+File output from cmh_test.py will be saved in the outdir, with the original
+name of the input file, but with the suffix "_CMH-test-results.txt"''')
     requiredNAMED.add_argument("--case",
                                required=True,
                                default=None,
