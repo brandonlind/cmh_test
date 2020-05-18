@@ -36,7 +36,9 @@ required arguments:
                         unstitched_locus-unstitched_pos. FREQ columns from VarScan are also
                         assumed.
   -o OUTDIR, --outdir OUTDIR
-                        /path/to/pypoolation_output_dir/
+                        /path/to/cmh_test_output_dir/
+                        File output from cmh_test.py will be saved in the outdir, with the original
+                        name of the input file, but with the suffix "_CMH-test-results.txt"
   --case CASE           The string present in every column for pools in "case" treatments.
   --control CONTROL     The string present in every column for pools in "control" treatments.
   -p PLOIDYFILE, --ploidy PLOIDYFILE
