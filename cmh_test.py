@@ -14,6 +14,22 @@ import os, sys, argparse, shutil, subprocess, pandas as pd, threading, ipyparall
 import pickle
 from os import path as op
 
+def check_pyversion() -> None:
+    """Make sure python is 3.6 <= version < 3.8."""
+    pyversion = float(str(sys.version_info[0]) + '.' + str(sys.version_info[1]))
+    if not pyversion >= 3.6:
+        text = f'''FAIL: You are using python {pyversion}. This pipeline was built with python 3.7.
+FAIL: use  3.6 <= python version < 3.8
+FAIL: exiting cmh_test.py'''
+        print(ColorText(text).fail())
+        exit()
+    if not pyversion < 3.8:
+        print(ColorText("FAIL: python 3.8 has issues with the ipyparallel engine returns.").fail())
+        print(ColorText("FAIL: use  3.6 <= python version < 3.8").fail())
+        print(ColorText("FAIL: exiting cmh_test.py").fail())
+        exit()
+
+
 def pklload(path:str):
     """Load object from a .pkl file."""
     pkl = pickle.load(open(path, 'rb'))
@@ -36,7 +52,7 @@ def attach_data(**kwargs) -> None:
     num_engines = len(kwargs['dview'])
     print(ColorText("\nAdding data to engines ...").bold())
     print(ColorText("\tWARN: Watch available mem in another terminal window: 'watch free -h'").warn())
-    print(ColorText("\tWARN: If available mem gets too low, kill engines and restart pypoolation with fewer engines: 'ipcluster stop'").warn())
+    print(ColorText("\tWARN: If available mem gets too low, kill engines and restart cmh_test.py with fewer engines: 'ipcluster stop'").warn())
     for key,value in kwargs.items():
         if key != 'dview':
             print(f'\tLoading {key} ({value.__class__.__name__}) to {num_engines} engines')
@@ -140,7 +156,7 @@ def wait_for_engines(engines:int, profile:str):
             print(ColorText("\tFAIL: Make sure that if any cluster is running, the -e arg matches the number of engines.").fail())
             print(ColorText("\tFAIL: In some cases, not all expected engines can start on a busy server.").fail())
             print(ColorText("\tFAIL: Therefore, it may be the case that available engines will be less than requested.").fail())
-            print(ColorText("\tFAIL: pypoolation found %s engines, with -e set to %s" % (len(lview), engines)).fail())
+            print(ColorText("\tFAIL: cmh_test.py found %s engines, with -e set to %s" % (len(lview), engines)).fail())
             answer = askforinput(msg='Would you like to continue with %s engines? (choosing no will wait another 60 seconds)' % len(lview), tab='\t', newline='')
             if answer == 'yes':
                 break
@@ -346,7 +362,7 @@ assumed.
                                default=None,
                                dest="outdir",
                                type=str,
-                               help='''/path/to/pypoolation_output_dir/
+                               help='''/path/to/cmh_test_output_dir/
 File output from cmh_test.py will be saved in the outdir, with the original
 name of the input file, but with the suffix "_CMH-test-results.txt"''')
     requiredNAMED.add_argument("--case",
@@ -387,7 +403,7 @@ will prompt for pool_name if necessary.''')
     if not op.exists(args.outdir):
         print(ColorText(f"FAIL: the directory for the output file(s) does not exist.").fail())
         print(ColorText(f"FAIL: please create this directory: %s" % args.outdir).fail())
-        print(ColorText("exiting pypoolation.py").fail())
+        print(ColorText("exiting cmh_test.py").fail())
         exit()
 
     # make sure input and ploidyfile exist
@@ -460,6 +476,9 @@ def read_input(inputfile):
 
 
 def main():
+    # make sure it's not python3.8
+    check_pyversion()
+
     # parse input arguments
     args = get_parse()
     
