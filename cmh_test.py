@@ -414,8 +414,11 @@ will prompt for pool_name if necessary.''')
 
     # if input or ploidy file do not exist:
     if len(nopath) > 0:
-        print(ColorText("FAIL: The following path%s do not exist:" % "s" if len(nopath) > 1 else "").fail())
-        [print(ColorText("\nFAIL: %s" % f).fail()) for f in nopath]
+        print(ColorText("FAIL: The following path(s) do not exist:").fail())
+        for f in nopath:
+            print(ColorText("\tFAIL: %s" % f).fail())
+        print(ColorText('\nexiting cmh_test.py').fail())
+        exit()
     
     print('args = ', args)
     return args
