@@ -31,9 +31,9 @@ required arguments:
                         It is assumed that there is either a 'locus' or 'unstitched_locus' column.
                         The 'locus' column elements are the hyphen-separated
                         CHROM-POS. If the 'unstitched_chrom' column is present, the code will use the
-                        'unstitched_locus' column for SNP names, otherwise 'CHROM' and 'locus'. The
+                        'unstitched_locus' column for SNP names, otherwise 'locus'. The
                         'unstitched_locus' elements are therefore the hyphen-separated
-                        unstitched_locus-unstitched_pos. FREQ columns from VarScan are also
+                        unstitched_chrom-unstitched_pos. FREQ columns from VarScan are also
                         assumed.
   -o OUTDIR, --outdir OUTDIR
                         /path/to/cmh_test_output_dir/
