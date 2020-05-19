@@ -14,6 +14,7 @@ import os, sys, argparse, shutil, subprocess, pandas as pd, threading, ipyparall
 import pickle
 from os import path as op
 
+
 def check_pyversion() -> None:
     """Make sure python is 3.6 <= version < 3.8."""
     pyversion = float(str(sys.version_info[0]) + '.' + str(sys.version_info[1]))
@@ -215,9 +216,47 @@ def get_freq(string:str) -> float:
 
 
 def get_table(casedata, controldata, locus):
-    """Create stratified contingency tables for a given locus."""
+    """Create stratified contingency tables (each 2x2) for a given locus.
+
+    Each stratum is a population.
+    
+    Contingency table has treatment (case or control) as rows, and
+        allele (REF or ALT) as columns.
+
+    Example table
+    -------------
+    # in python
+    [1] mat = np.asarray([[0, 6, 0, 5],
+                          [3, 3, 0, 6],
+                          [6, 0, 2, 4],
+                          [5, 1, 6, 0],
+                          [2, 0, 5, 0]])
+    [2] [np.reshape(x.tolist(), (2, 2)) for x in mat]
+    
+    [out]
+        [array([[0, 6],
+                [0, 5]]),
+         array([[3, 3],
+                [0, 6]]),
+         array([[6, 0],
+                [2, 4]]),
+         array([[5, 1],
+                [6, 0]]),
+         array([[2, 0],
+                [5, 0]])]
+
+    # from R - see https://www.rdocumentation.org/packages/stats/versions/3.6.2/topics/mantelhaen.test
+    c(0, 0, 6, 5,
+      ...)
+            Response
+    Delay  Cured Died
+    None     0    6
+    1.5h     0    5
+    ...
+
+    """
     import numpy, pandas
-    tables = []
+    tables = []  # - a list of lists
     for casecol,controlcol in pairs.items():
         # get ploidy of pop
         pop = casecol.split('.FREQ')[0]
@@ -231,18 +270,18 @@ def get_table(casedata, controldata, locus):
         if sum([x!=x for x in [case_freq, cntrl_freq]]) > 0:
             continue
         
-        # collate info - a list of lists
+        # collate info for locus (create contingency table data)
         t = []
         for freq in [case_freq, cntrl_freq]:
             t.extend([(1-freq)*pop_ploidy,
                       freq*pop_ploidy])
         tables.append(t)
-    # return contingency tables for this locus
+    # return contingency tables (elements of list) for this locus stratified by population (list index)
     return [numpy.reshape(x.tolist(), (2, 2)) for x in numpy.asarray(tables)]
 
 
 def create_tables(*args):
-    """Get stratified contingency tables for all loci in input."""
+    """Get stratified contingency tables for all loci in cmh_test.py input file."""
     import pandas
     tables = {}
     for locus in args[0].index:
@@ -257,10 +296,15 @@ def cmh_test(*args):
     
     tables = create_tables(*args)
     
-    results = pandas.DataFrame(columns=['locus', 'statistic', 'p-value'])
+    # fill in a dataframe with cmh test results, one locus at a time
+    results = pandas.DataFrame(columns=['locus', 'statistic', 'p-value',
+                                        'lower_confidence', 'upper_confidence'])
     for locus,table in tables.items():
-        res = cmh(table).test_null_odds(True)
-        results.loc[len(results.index), :] = (locus, res.statistic, res.pvalue)
+        # cmh results for stratified contingency tables (called "table" = an array of tables)
+        cmh_res = cmh(table)
+        res = cmh_res.test_null_odds(True)  # statistic and p-value
+        conf = cmh_res.oddsratio_pooled_confint()  # lower and upper confidence
+        results.loc[len(results.index), :] = (locus, res.statistic, res.pvalue, *conf)
     
     return results
 
@@ -516,8 +560,12 @@ def main():
     print(ColorText(f'\nWriting all results to: ').bold().__str__()+ f'{outfile} ...')
     output.to_csv(outfile,
                   sep='\t', index=False)
+
+    # kill ipcluster to avoid mem problems
+    print(ColorText("\nStopping ipcluster ...").bold())
+    subprocess.call([shutil.which('ipcluster'), 'stop'])
     
-    print(ColorText('\nDONE!').green().bold())
+    print(ColorText('\nDONE!!\n').green().bold())
     pass
 
 
