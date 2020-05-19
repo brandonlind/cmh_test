@@ -1,12 +1,13 @@
 """
 Perform Cochran-Mantel-Haenszel chi-squared tests on stratified contingency tables.
 
-Each stratum is a pool.
+Each stratum is a population's contingency table; each population has a case and a control.
 
 Each contingency table is 2x2 - case and control x REF and ALT allele counts.
 
-ALT and REF allele counts are calculated by multiplying the ploidy of the pool by ...
-... either the ALT freq or (1-ALT_freq).
+ALT and REF allele counts are calculated by multiplying the ploidy of the population by ...
+... either the ALT freq or (1-ALT_freq), for each of case and control - unless any of ...
+... the counts are np.nan, then skip population.
 
 TODO: allow user to select specific populations (whichpops) for get_ploidy()
 """
