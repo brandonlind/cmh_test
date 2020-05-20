@@ -273,7 +273,7 @@ def get_table(casedata, controldata, locus):
         
         # collate info for locus (create contingency table data)
         t = []
-        for freq in [case_freq, cntrl_freq]:
+        for freq in [cntrl_freq, case_freq]:
             t.extend([(1-freq)*pop_ploidy,
                       freq*pop_ploidy])
         tables.append(t)
@@ -298,14 +298,15 @@ def cmh_test(*args):
     tables = create_tables(*args)
     
     # fill in a dataframe with cmh test results, one locus at a time
-    results = pandas.DataFrame(columns=['locus', 'statistic', 'p-value',
-                                        'lower_confidence', 'upper_confidence'])
+    results = pandas.DataFrame(columns=['locus', 'odds_ratio', 'p-value',
+                                        'lower_confidence', 'upper_confidence', 'num_pops'])
     for locus,table in tables.items():
         # cmh results for stratified contingency tables (called "table" = an array of tables)
         cmh_res = cmh(table)
         res = cmh_res.test_null_odds(True)  # statistic and p-value
+        odds_ratio = cmh_res.oddsratio_pooled  # odds ratio
         conf = cmh_res.oddsratio_pooled_confint()  # lower and upper confidence
-        results.loc[len(results.index), :] = (locus, res.statistic, res.pvalue, *conf)
+        results.loc[len(results.index), :] = (locus, odds_ratio, res.pvalue, *conf, len(table))
     
     return results
 
@@ -329,6 +330,8 @@ def parallelize_cmh(casedata, controldata, lview):
         if len(loci_to_send) == jobsize or count == len(casedata.index):
             jobs.append(lview.apply_async(cmh_test, *(casedata.loc[loci_to_send, :],
                                                       controldata.loc[loci_to_send, :])))
+#             jobs.append(cmh_test(casedata.loc[loci_to_send, :],
+#                                  controldata.loc[loci_to_send, :]))  # for testing
             loci_to_send = []
 
     # wait until jobs finish
@@ -337,6 +340,7 @@ def parallelize_cmh(casedata, controldata, lview):
     # gather output, concatenate into one datafram
     print(ColorText('\nGathering parallelized results ...').bold())
     output = pandas.concat([j.r for j in jobs])
+#     output = pandas.concat([j for j in jobs])  # for testing
     
     return output
 
@@ -344,6 +348,7 @@ def parallelize_cmh(casedata, controldata, lview):
 def get_cc_pairs(casecols, controlcols, case, control):
     """For a given population, pair its case column with its control column."""
     badcols = []
+#     global pairs  # for debugging
     pairs = {}
     for casecol in casecols:
         controlcol = casecol.replace(case, control)
@@ -442,6 +447,13 @@ will prompt for pool_name if necessary.''')
                         dest="profile",
                         type=str,
                         help="The ipcluster profile name with which to start engines. Default: 'default'")
+    parser.add_argument('--keep-engines',
+                        required=False,
+                        action='store_true',
+                        dest="keep_engines",
+                        help='''Boolean: true if used, false otherwise. If you want to keep
+the ipcluster engines alive, use this flag. Otherwise engines will be killed automatically.
+(default: False)''')
 
     # check flags
     args = parser.parse_args()
@@ -534,6 +546,7 @@ def main():
     df = read_input(args.input)
 
     # get ploidy for each pool to use to correct read counts for pseudoreplication
+#     global ploidy  # for debugging
     ploidy = get_ploidy(args.ploidyfile)
     
     # isolate case/control data
@@ -563,8 +576,9 @@ def main():
                   sep='\t', index=False)
 
     # kill ipcluster to avoid mem problems
-    print(ColorText("\nStopping ipcluster ...").bold())
-    subprocess.call([shutil.which('ipcluster'), 'stop'])
+    if args.keep_engines is False:
+        print(ColorText("\nStopping ipcluster ...").bold())
+        subprocess.call([shutil.which('ipcluster'), 'stop'])
     
     print(ColorText('\nDONE!!\n').green().bold())
     pass
