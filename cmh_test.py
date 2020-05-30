@@ -301,6 +301,8 @@ def cmh_test(*args):
     results = pandas.DataFrame(columns=['locus', 'odds_ratio', 'p-value',
                                         'lower_confidence', 'upper_confidence', 'num_pops'])
     for locus,table in tables.items():
+        if len(table) == 0:
+            continue
         # cmh results for stratified contingency tables (called "table" = an array of tables)
         cmh_res = cmh(table)
         res = cmh_res.test_null_odds(True)  # statistic and p-value
