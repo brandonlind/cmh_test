@@ -292,7 +292,7 @@ def create_tables(*args):
 
 def cmh_test(*args):
     """Perform Cochran-Mantel-Haenszel chi-squared test on stratified contingency tables."""
-    import pandas
+    import pandas, math
     from statsmodels.stats.contingency_tables import StratifiedTable as cmh
     
     tables = create_tables(*args)
@@ -322,7 +322,7 @@ def cmh_test(*args):
 
             # when I've observed this happen, the following are true
             assert res.statistic == math.inf
-            assert cmh_res.oddsratio_pooled_confint() != cmh_res.oddsratio_pooled_confint()  # np.nans
+            assert sum([math.isnan(x) for x in conf]) == 2  # np.nans ie (nan, nan)
 
             continue
         results.loc[len(results.index), :] = (locus, odds_ratio, res.pvalue, *conf, len(table))
