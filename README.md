@@ -5,7 +5,7 @@
 # cmh_test
 Using ipcluster engines to parallelize calculations from [varscan_pipeline](https://github.com/CoAdapTree/varscan_pipeline) outfiles, calculate Cochran-Mantel-Haenszel chi-squared tests on stratified contingency tables.
 
-Each stratum is a pool. Each contingency table is 2x2 - case and control x REF and ALT allele counts.
+Each stratum is a population. Each population has a "case" pool and a "control" pool. Together, these case and control pools make the contingency table. Each contingency table is 2x2 - case and control x REF and ALT allele counts.
 
 ALT and REF allele counts are calculated by multiplying the ploidy of the pool by ...
 ... either the ALT freq or (1-ALT_freq).

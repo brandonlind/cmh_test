@@ -292,7 +292,7 @@ def create_tables(*args):
 
 def cmh_test(*args):
     """Perform Cochran-Mantel-Haenszel chi-squared test on stratified contingency tables."""
-    import pandas
+    import pandas, math
     from statsmodels.stats.contingency_tables import StratifiedTable as cmh
     
     tables = create_tables(*args)
@@ -302,12 +302,29 @@ def cmh_test(*args):
                                         'lower_confidence', 'upper_confidence', 'num_pops'])
     for locus,table in tables.items():
         if len(table) == 0:
+            # if none of the populations for a locus provide a contingency table (due to missing data)
+            # ... then continue to the next locus.
             continue
         # cmh results for stratified contingency tables (called "table" = an array of tables)
         cmh_res = cmh(table)
         res = cmh_res.test_null_odds(True)  # statistic and p-value
         odds_ratio = cmh_res.oddsratio_pooled  # odds ratio
         conf = cmh_res.oddsratio_pooled_confint()  # lower and upper confidence
+        if odds_ratio != odds_ratio:
+            # if the odds_ratio is np.nan
+            # this can happen when all of the tables returned for a specific locus are fixed
+            # ... for either the REF or ALT. This happens rarely for loci with low MAF, where
+            # ... the populations that have variable case or control, do not have a frequency
+            # ... estimated for the other treatment (case or control) and therefore don't
+            # ... make it into the list of stratified tables and the remaining tables
+            # ... (populations) are all fixed for the REF or ALT - again, this happens for
+            # ... some low MAF loci and may happen if input file has few pops to stratify.
+
+            # when I've observed this happen, the following are true
+            assert res.statistic == math.inf
+            assert sum([math.isnan(x) for x in conf]) == 2  # np.nans ie (nan, nan)
+
+            continue
         results.loc[len(results.index), :] = (locus, odds_ratio, res.pvalue, *conf, len(table))
     
     return results
