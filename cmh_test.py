@@ -319,7 +319,7 @@ def cmh_test(*args):
 
         # look for fixed states across all tables
 
-        if sum([math.isnan(x) for x in conf]) == 2:
+        if sum([math.isnan(x) for x in conf]) > 0:
             # if the upper and lower estimat of the confidence interval are NA, ignore
             # this can happen when all of the tables returned for a specific locus are fixed
             # ... for either the REF or ALT. This happens rarely for loci with low MAF, where
