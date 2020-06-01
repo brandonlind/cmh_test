@@ -70,7 +70,7 @@ def watch_async(jobs:list, phase=None) -> None:
     from tqdm import trange
 
     print(ColorText(f"\nWatching {len(jobs)} {phase} jobs ...").bold())
-    
+
     job_idx = list(range(len(jobs)))
     for i in trange(len(jobs)):
         count = 0
@@ -220,7 +220,7 @@ def get_table(casedata, controldata, locus):
     """Create stratified contingency tables (each 2x2) for a given locus.
 
     Each stratum is a population.
-    
+
     Contingency table has treatment (case or control) as rows, and
         allele (REF or ALT) as columns.
 
@@ -233,7 +233,7 @@ def get_table(casedata, controldata, locus):
                           [5, 1, 6, 0],
                           [2, 0, 5, 0]])
     [2] [np.reshape(x.tolist(), (2, 2)) for x in mat]
-    
+
     [out]
         [array([[0, 6],
                 [0, 5]]),
@@ -262,15 +262,15 @@ def get_table(casedata, controldata, locus):
         # get ploidy of pop
         pop = casecol.split('.FREQ')[0]
         pop_ploidy = ploidy[pop]
-        
+
         # get case-control frequencies of ALT allele
         case_freq = get_freq(casedata.loc[locus, casecol])
         cntrl_freq = get_freq(controldata.loc[locus, controlcol])
-        
+
         # see if either freq is np.nan, if so, skip this pop
         if sum([x!=x for x in [case_freq, cntrl_freq]]) > 0:
             continue
-        
+
         # collate info for locus (create contingency table data)
         t = []
         for freq in [cntrl_freq, case_freq]:
@@ -287,16 +287,20 @@ def create_tables(*args):
     tables = {}
     for locus in args[0].index:
         tables[locus] = get_table(*args, locus)
-    return tables    
+    return tables
 
 
 def cmh_test(*args):
     """Perform Cochran-Mantel-Haenszel chi-squared test on stratified contingency tables."""
     import pandas, math
     from statsmodels.stats.contingency_tables import StratifiedTable as cmh
-    
+
+    # set up data logging
+    ignored = {}
+
+    # get contingency tables for pops with case and control data
     tables = create_tables(*args)
-    
+
     # fill in a dataframe with cmh test results, one locus at a time
     results = pandas.DataFrame(columns=['locus', 'odds_ratio', 'p-value',
                                         'lower_confidence', 'upper_confidence', 'num_pops'])
@@ -304,14 +308,19 @@ def cmh_test(*args):
         if len(table) == 0:
             # if none of the populations for a locus provide a contingency table (due to missing data)
             # ... then continue to the next locus.
+            ignored[locus] = 'there were no populations that provided contingency tables'
             continue
         # cmh results for stratified contingency tables (called "table" = an array of tables)
         cmh_res = cmh(table)
         res = cmh_res.test_null_odds(True)  # statistic and p-value
         odds_ratio = cmh_res.oddsratio_pooled  # odds ratio
         conf = cmh_res.oddsratio_pooled_confint()  # lower and upper confidence
-        if odds_ratio != odds_ratio:
-            # if the odds_ratio is np.nan
+        locus_results = locus, odds_ratio, res.pvalue, *conf, len(table)
+
+        # look for fixed states across all tables
+
+        if sum([math.isnan(x) for x in conf]) > 0:
+            # if the upper and lower estimat of the confidence interval are NA, ignore
             # this can happen when all of the tables returned for a specific locus are fixed
             # ... for either the REF or ALT. This happens rarely for loci with low MAF, where
             # ... the populations that have variable case or control, do not have a frequency
@@ -320,23 +329,24 @@ def cmh_test(*args):
             # ... (populations) are all fixed for the REF or ALT - again, this happens for
             # ... some low MAF loci and may happen if input file has few pops to stratify.
 
-            # when I've observed this happen, the following are true
-            assert res.statistic == math.inf
-            assert sum([math.isnan(x) for x in conf]) == 2  # np.nans ie (nan, nan)
+            # log reason
+            ignored[locus] = 'the upper and lower confidence interval for the odds ratio was NA'
+            ignored[locus] = ignored[locus] + '\t' + '\t'.join(map(str, locus_results[1:]))
 
             continue
-        results.loc[len(results.index), :] = (locus, odds_ratio, res.pvalue, *conf, len(table))
-    
-    return results
+
+        results.loc[len(results.index), :] = locus_results
+
+    return results, ignored
 
 
 def parallelize_cmh(casedata, controldata, lview):
     """Parallelize Cochran-Mantel-Haenszel chi-squared tests by groups of loci."""
     print(ColorText('\nParallelizing CMH calls ...').bold())
     import math, tqdm, pandas
-    
+
     jobsize = math.ceil(len(casedata.index)/len(lview))
-    
+
     # send jobs to engines
     numjobs = (len(casedata.index)/jobsize)+1
     print(ColorText("\nSending %d jobs to engines ..." % numjobs ).bold())
@@ -355,13 +365,14 @@ def parallelize_cmh(casedata, controldata, lview):
 
     # wait until jobs finish
     watch_async(jobs, phase='CMH test')
-    
+
     # gather output, concatenate into one datafram
     print(ColorText('\nGathering parallelized results ...').bold())
-    output = pandas.concat([j.r for j in jobs])
+    logs = dict((locus,reason) for j in jobs for (locus,reason) in j.r[1].items())
+    output = pandas.concat([j.r[0] for j in jobs])
 #     output = pandas.concat([j for j in jobs])  # for testing
-    
-    return output
+
+    return output, logs
 
 
 def get_cc_pairs(casecols, controlcols, case, control):
@@ -375,15 +386,15 @@ def get_cc_pairs(casecols, controlcols, case, control):
             badcols.append((casecol, controlcol))
             continue
         pairs[casecol] = controlcol
-    
+
     if len(badcols) > 0:
         print(ColorText('FAIL: The following case populations to not have a valid control column in dataframe.').fail())
         for cs,ct in badcols:
             print(ColorText(f'FAIL: no match for {cs} named {ct} in dataframe').fail())
         print(ColorText('FAIL: These case columns have not been paired and will be excluded from analyses.').fail())
         askforinput()
-    
-    return pairs    
+
+    return pairs
 
 
 def get_data(df, case, control):
@@ -391,16 +402,17 @@ def get_data(df, case, control):
     # get columns for case and control
     casecols = [col for col in df if case in col and 'FREQ' in col]
     cntrlcols = [col for col in df if control in col and 'FREQ' in col]
-    
+
     # isolate data to separate dfs
     casedata = df[casecols]
     controldata = df[cntrlcols]
     assert casedata.shape == controldata.shape
-    
+
     # pair up case-control pops
     pairs = get_cc_pairs(casecols, cntrlcols, case, control)
-    
+
     return casedata, controldata, pairs
+
 
 def get_parse():
     """
@@ -411,7 +423,7 @@ def get_parse():
                                      add_help=True,
                                      formatter_class=argparse.RawTextHelpFormatter)
     requiredNAMED = parser.add_argument_group('required arguments')
-    
+
     requiredNAMED.add_argument("-i", "--input",
                                required=True,
                                default=None,
@@ -495,7 +507,7 @@ the ipcluster engines alive, use this flag. Otherwise engines will be killed aut
             print(ColorText("\tFAIL: %s" % f).fail())
         print(ColorText('\nexiting cmh_test.py').fail())
         exit()
-    
+
     print('args = ', args)
     return args
 
@@ -541,7 +553,7 @@ def read_input(inputfile):
     print(ColorText('\nReading input file ...').bold())
     # read in datatable
     df = pd.read_table(inputfile, sep='\t')
-    
+
     # set df index
     locuscol = 'unstitched_locus' if 'unstitched_locus' in df.columns else 'locus'
     if locuscol not in df:
@@ -550,7 +562,7 @@ def read_input(inputfile):
         print(ColorText('exiting cmh_test.py').fail())
         exit()
     df.index = df[locuscol].tolist()
-    
+
     return df
 
 
@@ -560,20 +572,20 @@ def main():
 
     # parse input arguments
     args = get_parse()
-    
+
     # read in datatable
     df = read_input(args.input)
 
     # get ploidy for each pool to use to correct read counts for pseudoreplication
 #     global ploidy  # for debugging
     ploidy = get_ploidy(args.ploidyfile)
-    
+
     # isolate case/control data
     casedata, controldata, pairs = get_data(df, args.case, args.control)
-    
+
     # get ipcluster engines
     lview,dview = launch_engines(args.engines, args.profile)
-    
+
     # attach data and functions to engines
     attach_data(ploidy=ploidy,
                 case=args.case,
@@ -584,21 +596,32 @@ def main():
                 get_table=get_table,
                 create_tables=create_tables,
                 dview=dview)
-    
+
     # run cmh tests in parallel
-    output = parallelize_cmh(casedata, controldata, lview)
-    
+    output,logs = parallelize_cmh(casedata, controldata, lview)
+
     # write to outfile
     outfile = op.join(args.outdir, op.basename(args.input).split(".")[0] + '_CMH-test-results.txt')
     print(ColorText(f'\nWriting all results to: ').bold().__str__()+ f'{outfile} ...')
     output.to_csv(outfile,
                   sep='\t', index=False)
 
+    # write logs
+    logfile = outfile.replace(".txt", ".log")
+    print(ColorText(f'\nWriting logs to: ').bold().__str__()+ f'{logfile} ...')
+    if len(logs) > 0:
+        with open(logfile, 'w') as o:
+            o.write('locus\treason_for_exclusion\todds_ratio\tp-value\tlower_confidence\tupper_confidence\tnum_pops\n')
+            lines = []
+            for locus,reason in logs.items():
+                lines.append(f'{locus}\t{reason}')
+            o.write("%s" % '\n'.join(lines))
+
     # kill ipcluster to avoid mem problems
     if args.keep_engines is False:
         print(ColorText("\nStopping ipcluster ...").bold())
         subprocess.call([shutil.which('ipcluster'), 'stop'])
-    
+
     print(ColorText('\nDONE!!\n').green().bold())
     pass
 
