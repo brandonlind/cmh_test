@@ -10,6 +10,10 @@ If you use or are inspired by code from this repo, please site related manuscrip
 
 - Zenodo - contains an archived release of this repository - [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5083798.svg)](https://doi.org/10.5281/zenodo.5083798)
 
+  ```
+  Lind B (2021) GitHub.com/brandonlind/cmh_test: preprint release (Version 1.0.0). Zenodo. http://doi.org/10.5281/zenodo.5083798
+  ```
+
 ---
 
 # cmh_test
