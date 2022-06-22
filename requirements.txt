@@ -1,5 +1,5 @@
 pandas==1.0.1
 ipyparallel==6.2.4
-numpy==1.18.1
+numpy==1.22.0
 statsmodels==0.11.1
 tqdm==4.43.0
